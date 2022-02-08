@@ -1,4 +1,4 @@
-use super::{DbPool, Table};
+use super::{PgPool, Table};
 use anyhow::Result;
 use futures::TryStreamExt;
 use sqlx::{Executor, Pool, Postgres};
@@ -36,7 +36,7 @@ impl ListOption {
 }
 
 impl User {
-    pub async fn create(self, pool: &DbPool) -> Result<Self> {
+    pub async fn create(self, pool: &PgPool) -> Result<Self> {
         let sql = "INSERT INTO users (username, first_name, last_name, email, mobie) VALUES ($1, $2, $3, $4, $5) RETURNING *;";
         let user = sqlx::query_as::<_, User>(sql)
             .bind(self.username)
@@ -49,7 +49,7 @@ impl User {
         Ok(user)
     }
 
-    pub async fn get(&mut self, pool: &DbPool, id: u32) -> Result<&Self> {
+    pub async fn get(&mut self, pool: &PgPool, id: u32) -> Result<&Self> {
         let sql = "SELECT * FROM users WHERE id = $1";
         let user = sqlx::query_as::<_, User>(sql)
             .bind(id)
@@ -59,7 +59,7 @@ impl User {
         Ok(self)
     }
 
-    pub async fn list(pool: &DbPool) -> Result<Vec<User>> {
+    pub async fn list(pool: &PgPool) -> Result<Vec<User>> {
         Ok(vec![])
     }
 }

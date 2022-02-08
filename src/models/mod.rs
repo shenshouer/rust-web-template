@@ -3,7 +3,7 @@ mod user;
 
 use std::collections::HashMap;
 
-use db::{pool, DbPool};
+use db::PgPool;
 
 /// 表特征
 /// 所有的数据实例都需要实现此特征
