@@ -1,9 +1,11 @@
+/// 数据库初始化相关与链接实例获取
 mod db;
+
+/// 用户模块数据操作实现
 mod user;
 
-use std::collections::HashMap;
-
 use db::PgPool;
+use std::collections::HashMap;
 
 /// 表特征
 /// 所有的数据实例都需要实现此特征
