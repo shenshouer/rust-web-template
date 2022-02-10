@@ -28,7 +28,7 @@ pub struct User {
 
 // list 查询条件
 #[derive(Debug, Default)]
-struct UserOption {
+pub struct UserOption {
     username: Option<String>,
     first_name: Option<String>,
     last_name: Option<String>,
@@ -81,8 +81,9 @@ impl Display for UserOption {
     }
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
-trait UserRepo {
+pub trait UserRepo {
     async fn create(&self, user: &CreateUser) -> Result<User>;
     async fn get(&self, id: Uuid) -> Result<User>;
     async fn delete(&self, id: Uuid) -> Result<User>;
@@ -90,7 +91,7 @@ trait UserRepo {
     async fn list(&self, fields: &UserOption) -> Result<Vec<User>>;
 }
 
-struct UserRepoImpl {
+pub struct UserRepoImpl {
     pool: Arc<PgPool>,
 }
 
@@ -200,34 +201,38 @@ mod tests {
         use super::*;
         use sqlx::postgres::PgPoolOptions;
         use std::sync::Arc;
+        use tracing::info;
 
-        println!("starting create init pool ");
+        // RUST_LOG=debug cargo t 运行测试时可以输出debug信息，并且输出sql语句
+        tracing_subscriber::fmt::init();
+
+        info!("starting create init pool ");
         let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect("postgres://postgres:p%40ssword%21@localhost")
             .await
             .unwrap();
 
-        println!("starting check test database if exists and drop it ");
+        info!("starting check test database if exists and drop it ");
         sqlx::query("drop database if exists test_user_repo")
             .execute(&pool)
             .await
             .unwrap();
 
-        println!("starting create new test database ");
+        info!("starting create new test database ");
         sqlx::query("create database test_user_repo")
             .execute(&pool)
             .await
             .unwrap();
 
-        println!("starting create new db pool ");
+        info!("starting create new db pool ");
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect("postgres://postgres:p%40ssword%21@localhost/test_user_repo")
             .await
             .unwrap();
 
-        println!("starting migrate schemas ");
+        info!("starting migrate schemas ");
         sqlx::migrate!().run(&pool).await.unwrap();
 
         let sut = UserRepoImpl {
@@ -243,13 +248,13 @@ mod tests {
             mobile: "18612424366".to_string(),
         };
 
-        println!("testing create new user ");
+        info!("testing create new user ");
         let ref user = sut.create(&create_entity).await.unwrap();
 
         assert_eq!(user.username, create_entity.username);
         assert_eq!(false, user.id.is_nil());
 
-        println!("testing get user ");
+        info!("testing get user ");
         let mut get_user = sut.get(user.id).await.unwrap();
         assert_eq!(user.id, get_user.id);
 
@@ -257,7 +262,7 @@ mod tests {
         get_user.username = "uu1".to_string();
         let update_user = sut.update(get_user).await.unwrap();
         assert_eq!("uu1", &update_user.username);
-        // println!("{}", serde_json::to_string(&update_user).unwrap());
+        // info!("{}", serde_json::to_string(&update_user).unwrap());
 
         println!("testing list users ");
         let ref user_option = UserOption {
@@ -267,9 +272,9 @@ mod tests {
         };
         let ref users = sut.list(&user_option).await.unwrap();
         assert_eq!(1, users.len());
-        // println!("{}", serde_json::to_string(users).unwrap());
+        // info!("{}", serde_json::to_string(users).unwrap());
 
-        println!("testing delete user ");
+        info!("testing delete user ");
         let old_user = users.get(0).unwrap();
         let ref delete_user = sut.delete(old_user.id).await.unwrap();
 
