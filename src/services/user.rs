@@ -7,7 +7,7 @@ use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[cfg_attr(test, mockall::automock)]
+// #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserService {
     async fn create(&self, user: &CreateUser) -> Result<User, AppError>;
@@ -15,14 +15,6 @@ pub trait UserService {
     async fn delete(&self, id: Uuid) -> Result<User, AppError>;
     async fn update(&self, id: Uuid, opt: &UserOption) -> Result<User, AppError>;
     async fn list(&self, opt: &UserOption) -> Result<Vec<User>, AppError>;
-}
-
-// controller层单元测试时，axum中间件传递UserService实现需要有Clone约束，此处增加automock自动实现的MockUserService的Clone方法
-#[cfg(test)]
-impl Clone for MockUserService {
-    fn clone(&self) -> Self {
-        MockUserService::new()
-    }
 }
 
 #[derive(Clone)]
