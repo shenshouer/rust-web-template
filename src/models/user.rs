@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::{fmt::Display, sync::Arc};
 
 use super::PgPool;
-use anyhow::Result;
+use crate::errors::AppError;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -27,15 +27,42 @@ pub struct User {
 }
 
 // list 查询条件
-#[derive(Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct UserOption {
-    username: Option<String>,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    email: Option<String>,
-    mobile: Option<String>,
-    limit: Option<u32>,
-    offset: Option<u32>,
+    pub username: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub email: Option<String>,
+    pub mobile: Option<String>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+impl UserOption {
+    pub fn new_user(self, origin_user: User) -> User {
+        let mut user = User { ..origin_user };
+        if let Some(username) = self.username {
+            user.username = username
+        }
+
+        if let Some(first_name) = self.first_name {
+            user.first_name = first_name
+        }
+
+        if let Some(last_name) = self.last_name {
+            user.last_name = last_name
+        }
+
+        if let Some(email) = self.email {
+            user.email = email
+        }
+
+        if let Some(mobile) = self.mobile {
+            user.mobile = mobile
+        }
+
+        user
+    }
 }
 
 // 实现std::fmt::Display trait，方便在format!中组装sql的查询条件
@@ -84,20 +111,27 @@ impl Display for UserOption {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserRepo {
-    async fn create(&self, user: &CreateUser) -> Result<User>;
-    async fn get(&self, id: Uuid) -> Result<User>;
-    async fn delete(&self, id: Uuid) -> Result<User>;
-    async fn update(&self, user: User) -> Result<User>;
-    async fn list(&self, fields: &UserOption) -> Result<Vec<User>>;
+    async fn create(&self, user: &CreateUser) -> Result<User, AppError>;
+    async fn get(&self, id: Uuid) -> Result<User, AppError>;
+    async fn delete(&self, id: Uuid) -> Result<User, AppError>;
+    async fn update(&self, user: &User) -> Result<User, AppError>;
+    async fn list(&self, fields: &UserOption) -> Result<Vec<User>, AppError>;
 }
 
+#[derive(Clone)]
 pub struct UserRepoImpl {
     pool: Arc<PgPool>,
 }
 
+impl UserRepoImpl {
+    pub fn new(pool: Arc<PgPool>) -> Self {
+        UserRepoImpl { pool }
+    }
+}
+
 #[async_trait]
 impl UserRepo for UserRepoImpl {
-    async fn create(&self, user: &CreateUser) -> Result<User> {
+    async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
         let sql = "INSERT INTO users (username, first_name, last_name, email, mobile) VALUES ($1, $2, $3, $4, $5) RETURNING *;";
         let user = sqlx::query_as::<_, User>(sql)
             .bind(&user.username)
@@ -110,7 +144,7 @@ impl UserRepo for UserRepoImpl {
         Ok(user)
     }
 
-    async fn get(&self, id: Uuid) -> Result<User> {
+    async fn get(&self, id: Uuid) -> Result<User, AppError> {
         let sql = "SELECT * FROM users WHERE id = $1";
         let user = sqlx::query_as::<_, User>(sql)
             .bind(id)
@@ -119,7 +153,7 @@ impl UserRepo for UserRepoImpl {
         Ok(user)
     }
 
-    async fn delete(&self, id: Uuid) -> Result<User> {
+    async fn delete(&self, id: Uuid) -> Result<User, AppError> {
         let user = sqlx::query_as(
             r#"
             DELETE FROM users
@@ -133,7 +167,7 @@ impl UserRepo for UserRepoImpl {
         Ok(user)
     }
 
-    async fn update(&self, user: User) -> Result<User> {
+    async fn update(&self, user: &User) -> Result<User, AppError> {
         let sql = r#"
         UPDATE users SET 
             username = $1, 
@@ -145,18 +179,18 @@ impl UserRepo for UserRepoImpl {
             RETURNING *
             "#;
         let user = sqlx::query_as::<_, User>(sql)
-            .bind(user.username)
-            .bind(user.first_name)
-            .bind(user.last_name)
-            .bind(user.email)
-            .bind(user.mobile)
-            .bind(user.id)
+            .bind(&user.username)
+            .bind(&user.first_name)
+            .bind(&user.last_name)
+            .bind(&user.email)
+            .bind(&user.mobile)
+            .bind(&user.id)
             .fetch_one(&*self.pool)
             .await?;
         Ok(user)
     }
 
-    async fn list(&self, opts: &UserOption) -> Result<Vec<User>> {
+    async fn list(&self, opts: &UserOption) -> Result<Vec<User>, AppError> {
         let sql = format!("SELECT * FROM users {opts}");
         let rows = sqlx::query_as(&sql).fetch_all(&*self.pool).await?;
         Ok(rows)
@@ -166,6 +200,8 @@ impl UserRepo for UserRepoImpl {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    // use tracing_test::traced_test;
+
     #[test]
     fn test_user_option_as_sql_condition() {
         use super::UserOption;
@@ -196,15 +232,13 @@ mod tests {
         assert_eq!(expect_condition, condition);
     }
 
+    // #[traced_test]
     #[tokio::test]
     async fn test_user_repo() -> Result<()> {
         use super::*;
         use sqlx::postgres::PgPoolOptions;
         use std::sync::Arc;
         use tracing::info;
-
-        // RUST_LOG=debug cargo t 运行测试时可以输出debug信息，并且输出sql语句
-        tracing_subscriber::fmt::init();
 
         info!("starting create init pool ");
         let pool = PgPoolOptions::new()
@@ -260,12 +294,12 @@ mod tests {
 
         println!("testing update user ");
         get_user.username = "uu1".to_string();
-        let update_user = sut.update(get_user).await.unwrap();
+        let update_user = sut.update(&get_user).await.unwrap();
         assert_eq!("uu1", &update_user.username);
         // info!("{}", serde_json::to_string(&update_user).unwrap());
 
         println!("testing list users ");
-        let ref user_option = UserOption {
+        let user_option = UserOption {
             username: Some(String::from("uu1")),
             first_name: Some(String::from("fn1")),
             ..Default::default()
