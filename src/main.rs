@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
 
     let pool = Arc::new(db::get_pool().await);
 
-    let app = Router::new().nest("/", routers::routers(pool.clone()));
+    let app = Router::new().nest("/api/v1", routers::routers(pool.clone()));
 
     let addr = format!("{}:{}", serv_addr, serv_port)
         .as_str()
