@@ -135,14 +135,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn init_log() {
-        tracing_subscriber::fmt::init();
-    }
-
     #[tokio::test]
     async fn test_user_controller_create() {
-        tracing_subscriber::fmt::init();
         let create_user_param = &CreateUser {
             username: "u".to_string(),
             first_name: "fn".to_string(),

@@ -10,8 +10,12 @@ use thiserror::Error;
 pub enum AppError {
     #[error("data store error")]
     DataStoreError(#[from] sqlx::Error),
+    #[error("token store error")]
+    TokenStoreError(#[from] redis::RedisError),
     #[error("unknown app error")]
     Unknown,
+    #[error("other error")]
+    Other(String),
 }
 
 impl IntoResponse for AppError {
@@ -26,5 +30,11 @@ impl IntoResponse for AppError {
         }));
 
         (StatusCode::OK, body).into_response()
+    }
+}
+
+impl AppError {
+    pub fn new_other_error(msg: String) -> AppError {
+        AppError::Other(msg)
     }
 }

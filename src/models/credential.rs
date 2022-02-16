@@ -17,8 +17,15 @@ pub trait CredentialRepo {
     async fn is_credential_exists(&self, credential: &Credential) -> bool;
 }
 
+#[derive(Clone)]
 pub struct CredentialRepoImpl {
     pool: Arc<PgPool>,
+}
+
+impl CredentialRepoImpl {
+    pub fn new(pool: Arc<PgPool>) -> Self {
+        CredentialRepoImpl { pool }
+    }
 }
 
 #[async_trait]
@@ -89,7 +96,6 @@ mod tests {
         };
 
         assert_eq!(false, sut.is_credential_exists(&credential).await);
-        let r = sut.save_credential(&credential).await;
         assert!(sut.save_credential(&credential).await.is_ok());
         assert_eq!(true, sut.is_credential_exists(&credential).await);
     }

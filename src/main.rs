@@ -1,6 +1,9 @@
 use anyhow::Result;
 use axum::Router;
-use cashbook::{models::db, routers};
+use cashbook::{
+    models::{db, redis},
+    routers,
+};
 use dotenv::dotenv;
 use std::env;
 use std::net::SocketAddr;
@@ -15,8 +18,12 @@ async fn main() -> Result<()> {
     let serv_port = env::var("SERV_PORT").unwrap_or("8080".to_string());
 
     let pool = Arc::new(db::get_pool().await);
+    let redis_client = Arc::new(redis::get_client().await);
 
-    let app = Router::new().nest("/api/v1", routers::routers(pool.clone()));
+    let app = Router::new().nest(
+        "/api/v1",
+        routers::routers(pool.clone(), redis_client.clone()),
+    );
 
     let addr = format!("{}:{}", serv_addr, serv_port)
         .as_str()

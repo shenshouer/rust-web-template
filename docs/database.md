@@ -18,3 +18,9 @@ cargo install sqlx-cli
 DATABASE_URL=postgres://postgres:p%40ssword%21@localhost/cashbook sqlx migrate add users
 DATABASE_URL=postgres://postgres:p%40ssword%21@localhost/cashbook sqlx migrate run
 ```
+
+## redis缓存
+
+```
+docker run --name redis -p 6379:6379 -d redis
+```
