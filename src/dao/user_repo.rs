@@ -1,11 +1,11 @@
-use axum::async_trait;
-use std::sync::Arc;
-
 use crate::{
     errors::AppError,
     models::user::{CreateUser, User, UserOption},
 };
+use axum::async_trait;
+use chrono::Utc;
 use sqlx::postgres::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
@@ -32,15 +32,22 @@ impl UserRepoImpl {
 #[async_trait]
 impl UserRepo for UserRepoImpl {
     async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
-        let sql = "INSERT INTO users (first_name, last_name, email, mobile) VALUES ($1, $2, $3, $4) RETURNING *;";
-        let user = sqlx::query_as::<_, User>(sql)
-            .bind(&user.first_name)
-            .bind(&user.last_name)
+        let sql = format!(
+            "
+            INSERT INTO {} (name, email, password, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            ",
+            User::TABLE,
+        );
+        Ok(sqlx::query_as(&sql)
+            .bind(&user.name)
             .bind(&user.email)
-            .bind(&user.mobile)
+            .bind(&user.password)
+            .bind(Utc::now())
+            .bind(Utc::now())
             .fetch_one(&*self.pool)
-            .await?;
-        Ok(user)
+            .await?)
     }
 
     async fn get(&self, id: Uuid) -> Result<User, AppError> {
@@ -69,18 +76,18 @@ impl UserRepo for UserRepoImpl {
     async fn update(&self, user: &User) -> Result<User, AppError> {
         let sql = r#"
         UPDATE users SET 
-            first_name = $1, 
-            last_name = $2,  
-            email = $3,
-            mobile = $4
+            name = $1,  
+            email = $2,
+            password = $3,
+            updated_at = $4
             WHERE id = $5
             RETURNING *
             "#;
         let user = sqlx::query_as::<_, User>(sql)
-            .bind(&user.first_name)
-            .bind(&user.last_name)
+            .bind(&user.name)
             .bind(&user.email)
-            .bind(&user.mobile)
+            .bind(&user.password)
+            .bind(Utc::now())
             .bind(&user.id)
             .fetch_one(&*self.pool)
             .await?;
@@ -105,6 +112,8 @@ mod tests {
         use sqlx::postgres::PgPoolOptions;
         use std::sync::Arc;
         use tracing::info;
+        // std::env::set_var("RUST_LOG", "debug");
+        // tracing_subscriber::fmt::init();
 
         info!("starting create init pool ");
         let pool = PgPoolOptions::new()
@@ -141,16 +150,15 @@ mod tests {
 
         // test create entity
         let create_entity = CreateUser {
-            first_name: "fn1".to_string(),
-            last_name: "ln1".to_string(),
+            name: "fn1".to_string(),
             email: "email1".to_string(),
-            mobile: "18612424366".to_string(),
+            password: "".to_string(),
         };
 
         info!("testing create new user ");
         let ref user = sut.create(&create_entity).await.unwrap();
 
-        assert_eq!(user.mobile, create_entity.mobile);
+        assert_eq!(user.name, create_entity.name);
         assert_eq!(false, user.id.is_nil());
 
         info!("testing get user ");
@@ -158,14 +166,14 @@ mod tests {
         assert_eq!(user.id, get_user.id);
 
         println!("testing update user ");
-        get_user.mobile = "1111".to_string();
+        get_user.name = "1111".to_string();
         let update_user = sut.update(&get_user).await.unwrap();
-        assert_eq!("1111", &update_user.mobile);
+        assert_eq!("1111", &update_user.name);
         // info!("{}", serde_json::to_string(&update_user).unwrap());
 
         println!("testing list users ");
         let user_option = UserOption {
-            first_name: Some(String::from("fn1")),
+            name: Some(String::from("1111")),
             ..Default::default()
         };
         let ref users = sut.list(&user_option).await.unwrap();

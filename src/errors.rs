@@ -12,8 +12,6 @@ pub enum AppError {
     DataStoreError(#[from] sqlx::Error),
     #[error("token store error")]
     TokenStoreError(#[from] redis::RedisError),
-    #[error("unknown app error")]
-    Unknown,
     #[error("other error")]
     Other(String),
 }
@@ -34,6 +32,7 @@ impl IntoResponse for AppError {
 }
 
 impl AppError {
+    #[allow(dead_code)]
     pub fn new_other_error(msg: String) -> AppError {
         AppError::Other(msg)
     }

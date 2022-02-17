@@ -95,10 +95,9 @@ mod tests {
     impl UserService for MockUserService {
         async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
             Ok(User {
-                first_name: user.first_name.clone(),
-                last_name: user.last_name.clone(),
+                name: user.name.clone(),
                 email: user.email.clone(),
-                mobile: user.mobile.clone(),
+                password: user.password.clone(),
                 ..Default::default()
             })
         }
@@ -137,10 +136,9 @@ mod tests {
     #[tokio::test]
     async fn test_user_controller_create() {
         let create_user_param = &CreateUser {
-            first_name: "fn".to_string(),
-            last_name: "ln".to_string(),
+            name: "fn".to_string(),
             email: "shenshouer51@gmail.com".to_string(),
-            mobile: "18612424366".to_string(),
+            password: "18612424366".to_string(),
         };
 
         let app = configure(MockUserService::new());
@@ -164,7 +162,7 @@ mod tests {
 
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let user: User = serde_json::from_slice(&body).unwrap();
-        assert_eq!(create_user_param.mobile, user.mobile);
+        assert_eq!(create_user_param.name, user.name);
     }
 
     #[tokio::test]

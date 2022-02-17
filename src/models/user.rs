@@ -1,34 +1,48 @@
-use std::fmt::Display;
-
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use uuid::Uuid;
 
 // User创建参数
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateUser {
-    pub first_name: String,
-    pub last_name: String,
+    pub name: String,
     pub email: String,
-    pub mobile: String,
+    pub password: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, Debug, Clone, sqlx::FromRow)]
 pub struct User {
     pub id: Uuid,
-    pub first_name: String,
-    pub last_name: String,
+    pub name: String,
     pub email: String,
-    pub mobile: String,
+    pub password: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl User {
+    pub const TABLE: &'static str = "users";
+}
+
+impl Default for User {
+    fn default() -> Self {
+        User {
+            id: Uuid::new_v4(),
+            name: Default::default(),
+            email: Default::default(),
+            password: Default::default(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
 }
 
 // list 查询条件
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct UserOption {
-    pub username: Option<String>,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
+    pub name: Option<String>,
     pub email: Option<String>,
-    pub mobile: Option<String>,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
 }
@@ -37,20 +51,12 @@ impl UserOption {
     pub fn new_user(self, origin_user: User) -> User {
         let mut user = User { ..origin_user };
 
-        if let Some(first_name) = self.first_name {
-            user.first_name = first_name
-        }
-
-        if let Some(last_name) = self.last_name {
-            user.last_name = last_name
+        if let Some(name) = self.name {
+            user.name = name
         }
 
         if let Some(email) = self.email {
             user.email = email
-        }
-
-        if let Some(mobile) = self.mobile {
-            user.mobile = mobile
         }
 
         user
@@ -62,17 +68,12 @@ impl Display for UserOption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // where condition assemble
         let mut where_condition = String::from("");
-        if let Some(ref first_name) = self.first_name {
-            where_condition = format!("{where_condition}first_name='{first_name}' AND ");
+        if let Some(ref name) = self.name {
+            where_condition = format!("{where_condition}name='{name}' AND ");
         }
-        if let Some(ref last_name) = self.last_name {
-            where_condition = format!("{where_condition}last_name='{last_name}' AND ");
-        }
+
         if let Some(ref email) = self.email {
             where_condition = format!("{where_condition}email='{email}' AND ");
-        }
-        if let Some(ref mobile) = self.mobile {
-            where_condition = format!("{where_condition}mobile='{mobile}' ");
         }
 
         if where_condition.len() > 0 {
@@ -93,7 +94,7 @@ impl Display for UserOption {
         } else {
             offset_condition = format!("{offset_condition} LIMIT 20");
         }
-        write!(f, " {where_condition} {offset_condition}")
+        write!(f, "{where_condition}{offset_condition}")
     }
 }
 
@@ -104,25 +105,25 @@ mod tests {
         use super::UserOption;
 
         let default_option = UserOption::default();
-        let expect_offset_condition = String::from("  OFFSET 0 LIMIT 20");
+        let expect_offset_condition = String::from("OFFSET 0 LIMIT 20");
         let offset_condition = format!("{default_option}");
         assert_eq!(expect_offset_condition, offset_condition);
 
         let where_option_one = UserOption {
-            mobile: Some("18612424366".to_string()),
+            name: Some("18612424366".to_string()),
             offset: Some(2),
             ..Default::default()
         };
-        let expect_condition = " WHERE mobile='18612424366' OFFSET 2 LIMIT 20";
+        let expect_condition = "WHERE name='18612424366' OFFSET 2 LIMIT 20";
         let condition = format!("{where_option_one}");
         assert_eq!(expect_condition, condition);
 
         let where_option_two = UserOption {
-            mobile: Some("18612424366".to_string()),
+            name: Some("18612424366".to_string()),
             offset: Some(4),
             ..Default::default()
         };
-        let expect_condition = " WHERE mobile='18612424366' OFFSET 4 LIMIT 20";
+        let expect_condition = "WHERE name='18612424366' OFFSET 4 LIMIT 20";
         let condition = format!("{where_option_two}");
         assert_eq!(expect_condition, condition);
     }

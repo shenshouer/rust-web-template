@@ -69,6 +69,7 @@ pub mod tests {
         dao::user_repo::MockUserRepo,
         models::user::{CreateUser, User, UserOption},
     };
+    use chrono::Utc;
     use mockall::predicate::*;
     use uuid::Uuid;
 
@@ -83,20 +84,20 @@ pub mod tests {
             .returning(|param| {
                 Ok(User {
                     id: Uuid::new_v4(),
-                    first_name: param.first_name.clone(),
-                    last_name: param.last_name.clone(),
+                    name: param.name.clone(),
+                    password: param.password.clone(),
                     email: param.email.clone(),
-                    mobile: param.mobile.clone(),
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
                 })
             });
 
         let sut = UserServiceImpl { user_repo };
         let mock_create_result = sut
             .create(&CreateUser {
-                first_name: "f1".to_string(),
-                last_name: "l1".to_string(),
+                name: "f1".to_string(),
+                password: "l1".to_string(),
                 email: "shenshouer51@gmail.com".to_string(),
-                mobile: "18612424366".to_string(),
             })
             .await;
         assert!(mock_create_result.is_ok());
@@ -174,7 +175,7 @@ pub mod tests {
         let sut = UserServiceImpl { user_repo };
 
         let opt = &UserOption {
-            username: Some("fk".to_string()),
+            name: Some("fk".to_string()),
             ..Default::default()
         };
         let mock_update_result = sut.update(uid, opt).await;
