@@ -1,9 +1,9 @@
-use crate::errors::AppError;
-pub(crate) use crate::models::{
-    credential::{Credential, CredentialRepo, CredentialRepoImpl},
-    token::{RedisTokenRepoImpl, Token, TokenRepo},
+pub(crate) use crate::dao::{
+    CredentialRepo, CredentialRepoImpl, RedisTokenRepoImpl, Token, TokenRepo,
 };
-use async_trait::async_trait;
+use crate::errors::AppError;
+pub(crate) use crate::models::credential::Credential;
+use axum::async_trait;
 use std::sync::Arc;
 use tracing::error;
 
@@ -69,7 +69,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{credential::MockCredentialRepo, token::MockTokenRepo};
+    use crate::dao::{MockCredentialRepo, MockTokenRepo};
     use mockall::predicate::*;
 
     #[tokio::test]

@@ -82,8 +82,8 @@ mod tests {
     /// 单元测试不全面，mockall实现的trait + Clone 在axum中传递有问题
     use super::*;
     use crate::services::user::{CreateUser, User, UserService};
-    use async_trait::async_trait;
     use axum::{
+        async_trait,
         body::Body,
         http::{self, request::Request, StatusCode},
     };
@@ -95,7 +95,6 @@ mod tests {
     impl UserService for MockUserService {
         async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
             Ok(User {
-                username: user.username.clone(),
                 first_name: user.first_name.clone(),
                 last_name: user.last_name.clone(),
                 email: user.email.clone(),
@@ -138,7 +137,6 @@ mod tests {
     #[tokio::test]
     async fn test_user_controller_create() {
         let create_user_param = &CreateUser {
-            username: "u".to_string(),
             first_name: "fn".to_string(),
             last_name: "ln".to_string(),
             email: "shenshouer51@gmail.com".to_string(),

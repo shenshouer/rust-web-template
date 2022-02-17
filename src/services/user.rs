@@ -1,8 +1,9 @@
 pub use crate::{
+    dao::user_repo::{UserRepo, UserRepoImpl},
     errors::AppError,
-    models::user::{CreateUser, User, UserOption, UserRepo, UserRepoImpl},
+    models::user::{CreateUser, User, UserOption},
 };
-use async_trait::async_trait;
+use axum::async_trait;
 use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -64,7 +65,10 @@ where
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::models::user::{CreateUser, MockUserRepo, User, UserOption};
+    use crate::{
+        dao::user_repo::MockUserRepo,
+        models::user::{CreateUser, User, UserOption},
+    };
     use mockall::predicate::*;
     use uuid::Uuid;
 
@@ -79,7 +83,6 @@ pub mod tests {
             .returning(|param| {
                 Ok(User {
                     id: Uuid::new_v4(),
-                    username: param.username.clone(),
                     first_name: param.first_name.clone(),
                     last_name: param.last_name.clone(),
                     email: param.email.clone(),
@@ -90,7 +93,6 @@ pub mod tests {
         let sut = UserServiceImpl { user_repo };
         let mock_create_result = sut
             .create(&CreateUser {
-                username: "u1".to_string(),
                 first_name: "f1".to_string(),
                 last_name: "l1".to_string(),
                 email: "shenshouer51@gmail.com".to_string(),
@@ -160,7 +162,6 @@ pub mod tests {
             .returning(|id| {
                 Ok(User {
                     id: id,
-                    username: "u".to_string(),
                     ..Default::default()
                 })
             });

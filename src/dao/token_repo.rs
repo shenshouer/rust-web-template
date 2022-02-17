@@ -1,18 +1,8 @@
 use crate::errors::AppError;
-use async_trait::async_trait;
+use axum::async_trait;
 use redis::AsyncCommands;
 use std::sync::Arc;
 use uuid::Uuid;
-
-pub type Token = String;
-
-#[cfg_attr(test, mockall::automock)]
-#[async_trait]
-pub trait TokenRepo {
-    async fn generate_token(&self) -> Token;
-    async fn save_token(&self, token: &Token, username: &String) -> Result<(), AppError>;
-    async fn get_username_by_token(&self, token: &Token) -> Option<String>;
-}
 
 #[derive(Clone)]
 pub struct RedisTokenRepoImpl {
@@ -24,6 +14,8 @@ impl RedisTokenRepoImpl {
         RedisTokenRepoImpl { client }
     }
 }
+
+use super::{Token, TokenRepo};
 
 #[async_trait]
 impl TokenRepo for RedisTokenRepoImpl {

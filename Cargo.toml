@@ -2,7 +2,6 @@
 name = "cashbook"
 version = "0.1.0"
 edition = "2021"
-default-run = "cashbook"
 
 [lib]
 name = "cashbook"
@@ -19,14 +18,16 @@ tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "uuid" ] }
 anyhow = "1.0"
 futures = "0.3"
-async-trait = "0.1"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 thiserror = "1.0"
 redis = { version = "0.21", features = ["tokio-comp"] }
+clap = { version = "3", features = ["derive", "env"] }
+lazy_static = "1.4"
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.2", features = ["full"] }
 
 [dev-dependencies]
 mockall = "0.11"
-tower = { version = "0.4", features = ["util"] }
 mime = "0.3"
 hyper = "0.14"
 # tracing-test = "0.1"

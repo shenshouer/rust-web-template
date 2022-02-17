@@ -56,7 +56,7 @@ async fn authenticate<T: AuthService>(
 mod tests {
     use super::*;
     use crate::{errors::AppError, services::auth::AuthService};
-    use async_trait::async_trait;
+    use axum::async_trait;
     use axum::{
         body::Body,
         http::{self, request::Request, StatusCode},
