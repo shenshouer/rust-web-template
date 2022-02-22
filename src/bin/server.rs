@@ -7,7 +7,7 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    use config::{db::DbPool, redis::RedisClient};
+    use config::db::DbPool;
 
     dotenv().ok();
     tracing_subscriber::fmt()
@@ -18,12 +18,11 @@ async fn main() -> Result<()> {
     let config = config::env::ServerConfig::parse();
 
     let pool = sqlx::PgPool::retrieve().await;
-    let redis_client = redis::Client::retrieve().await;
 
     let addr = SocketAddr::from((config.serv_host, config.serv_port));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
-        .serve(cashbook::app(pool, redis_client).into_make_service())
+        .serve(cashbook::app(pool).into_make_service())
         .await
         .unwrap();
     Ok(())

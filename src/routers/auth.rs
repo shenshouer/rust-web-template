@@ -1,126 +1,84 @@
-/// 认证模块
-///
+use super::jwt;
+use super::ApiResponse;
 use crate::{
-    errors::AppError,
-    services::auth::{AuthService, AuthServiceImpl, Credential, Token},
+    config::constants::BEARER,
+    dto::{
+        auth::{LoginInput, TokenPayload},
+        validate_payload,
+    },
+    errors::ApiResult,
+    services::auth::{DynAuthService, User},
 };
 use axum::{
-    extract::Extension, response::IntoResponse, routing::post, AddExtensionLayer, Json, Router,
+    extract::Extension,
+    routing::{get, post},
+    Json, Router,
 };
-use sqlx::postgres::PgPool;
-use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct TokenParam {
-    pub token: Token,
+pub(crate) fn router() -> Router {
+    configure()
 }
 
-pub(crate) fn router(pool: Arc<PgPool>, client: Arc<redis::Client>) -> Router {
-    configure(AuthServiceImpl::new(pool, client))
-}
-
-fn configure<T>(svc: T) -> Router
-where
-    T: AuthService + Clone + Send + Sync + 'static,
-{
+fn configure() -> Router {
     Router::new()
-        .route("/register", post(registry::<T>))
-        .route("/login", post(login::<T>))
-        .route("/authenticate", post(authenticate::<T>))
-        .layer(&AddExtensionLayer::new(svc))
+        .route("/login", post(login))
+        .route("/authorize", get(authorize))
 }
 
-async fn registry<T: AuthService>(
-    Extension(svc): Extension<T>,
-    Json(payload): Json<Credential>,
-) -> Result<Json<bool>, AppError> {
-    Ok(svc.register(&payload).await?.into())
+pub async fn authorize(user: User) -> ApiResponse<User> {
+    ApiResponse::success(user)
 }
 
-async fn login<T: AuthService>(
-    Extension(svc): Extension<T>,
-    Json(payload): Json<Credential>,
-) -> impl IntoResponse {
-    Json(svc.login(&payload).await)
-}
-
-async fn authenticate<T: AuthService>(
-    Extension(svc): Extension<T>,
-    Json(token): Json<TokenParam>,
-) -> impl IntoResponse {
-    Json(svc.authenticate(&token.token).await)
+async fn login(
+    Extension(svc): Extension<DynAuthService>,
+    Json(input): Json<LoginInput>,
+) -> ApiResult<ApiResponse<TokenPayload>> {
+    validate_payload(&input)?;
+    let user = svc.sign_in(input).await?;
+    let token = jwt::sign(user.id)?;
+    Ok(ApiResponse::success(TokenPayload {
+        access_token: token,
+        token_type: BEARER.to_string(),
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{errors::AppError, services::auth::AuthService};
-    use axum::async_trait;
+    use crate::services::auth::MockAuthService;
+    use axum::AddExtensionLayer;
     use axum::{
         body::Body,
         http::{self, request::Request, StatusCode},
     };
+    use mockall::predicate::*;
+    use std::sync::Arc;
     use tower::ServiceExt;
 
-    #[derive(Clone, Default)]
-    struct MockAuthService {
-        pub failure_register: Option<bool>,
-        pub failure_login: Option<bool>,
-        pub failure_authenicate: Option<bool>,
-    }
-    impl MockAuthService {
-        fn new() -> Self {
-            MockAuthService::default()
-        }
-    }
-    #[async_trait]
-    impl AuthService for MockAuthService {
-        async fn register(&self, _credential: &Credential) -> Result<bool, AppError> {
-            if let Some(ok) = self.failure_register {
-                if ok {
-                    return Err(AppError::new_other_error(
-                        "failure with register".to_string(),
-                    ));
-                }
-            }
-            Ok(true)
-        }
-        async fn login(&self, _credential: &Credential) -> Option<Token> {
-            if let Some(ok) = self.failure_login {
-                if ok {
-                    return None;
-                }
-            }
-            Some("mock_test".to_string())
-        }
-        async fn authenticate(&self, _token: &Token) -> Option<String> {
-            if let Some(ok) = self.failure_authenicate {
-                if ok {
-                    return None;
-                }
-            }
-            Some("mock_test".to_string())
-        }
+    fn configure_with_auth_service(auth_svc: DynAuthService) -> Router {
+        configure().layer(&AddExtensionLayer::new(auth_svc))
     }
 
     #[tokio::test]
-    async fn test_authenticate_failure() {
+    async fn test_login_success() {
         let mut svc = MockAuthService::new();
+        svc.expect_sign_in()
+            .with(always())
+            .returning(|_input| Ok(User::default()));
 
-        svc.failure_authenicate = Some(true);
-
-        let app = configure(svc);
+        std::env::set_var("JWT_SECRET", "example_secret_key");
+        let app = configure_with_auth_service(Arc::new(svc));
 
         let response = app
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/authenticate")
+                    .uri("/login")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(Body::from(
-                        serde_json::to_string(&TokenParam {
-                            token: "test".to_string(),
+                        serde_json::to_string(&LoginInput {
+                            email: "shenshouer@163.com".to_string(),
+                            password: "password".to_string(),
                         })
                         .unwrap(),
                     ))
@@ -131,35 +89,43 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let actual: Option<String> = serde_json::from_slice(&body).unwrap();
-        assert_eq!(actual, None);
+        // println!("----------> {:?}", core::str::from_utf8(&body.to_owned()));
+        let actual: ApiResponse<TokenPayload> = serde_json::from_slice(&body).unwrap();
+        // println!("{:?}", actual);
+        assert!(actual.ok);
+        assert!(actual.data.is_some());
     }
 
     #[tokio::test]
     async fn test_authenticate_success() {
-        let svc = MockAuthService::new();
-        let app = configure(svc);
+        let mut svc = MockAuthService::new();
+        svc.expect_get().returning(|id| {
+            Ok(User {
+                id: id,
+                email: "test@example.com".to_string(),
+                ..Default::default()
+            })
+        });
+
+        std::env::set_var("JWT_SECRET", "example_secret_key");
+        let app = configure_with_auth_service(Arc::new(svc));
 
         let response = app
             .oneshot(
-                Request::builder()
-                    .method(http::Method::POST)
-                    .uri("/authenticate")
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .body(Body::from(
-                        serde_json::to_string(&TokenParam {
-                            token: "test".to_string(),
-                        })
-                        .unwrap(),
-                    ))
-                    .unwrap(),
+            Request::builder()
+                .method(http::Method::GET)
+                .uri("/authorize")
+                .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
+                .body(Body::empty())
+                .unwrap()
             )
             .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let actual: Option<String> = serde_json::from_slice(&body).unwrap();
-        assert_eq!(actual, Some("mock_test".to_string()));
+        let actual: ApiResponse<User> = serde_json::from_slice(&body).unwrap();
+        assert!(actual.ok);
+        assert_eq!(actual.data.unwrap().email, "test@example.com");
     }
 }

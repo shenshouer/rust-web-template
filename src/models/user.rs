@@ -4,7 +4,7 @@ use std::fmt::Display;
 use uuid::Uuid;
 
 // User创建参数
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUser {
     pub name: String,
     pub email: String,
@@ -47,21 +47,21 @@ pub struct UserOption {
     pub offset: Option<u32>,
 }
 
-impl UserOption {
-    pub fn new_user(self, origin_user: User) -> User {
-        let mut user = User { ..origin_user };
+// impl UserOption {
+//     pub fn new_user(self, origin_user: User) -> User {
+//         let mut user = User { ..origin_user };
 
-        if let Some(name) = self.name {
-            user.name = name
-        }
+//         if let Some(name) = self.name {
+//             user.name = name
+//         }
 
-        if let Some(email) = self.email {
-            user.email = email
-        }
+//         if let Some(email) = self.email {
+//             user.email = email
+//         }
 
-        user
-    }
-}
+//         user
+//     }
+// }
 
 // 实现std::fmt::Display trait，方便在format!中组装sql的查询条件
 impl Display for UserOption {

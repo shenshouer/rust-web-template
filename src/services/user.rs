@@ -1,6 +1,7 @@
-pub use crate::{
+pub(crate) use crate::{
     dao::user_repo::{UserRepo, UserRepoImpl},
-    errors::AppError,
+    dto::user::{ListUserInput, RegisterInput, UpdateUserInput},
+    errors::Result,
     models::user::{CreateUser, User, UserOption},
 };
 use axum::async_trait;
@@ -8,14 +9,16 @@ use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-// #[cfg_attr(test, mockall::automock)]
+pub type DynUserService = Arc<dyn UserService + Send + Sync>;
+
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserService {
-    async fn create(&self, user: &CreateUser) -> Result<User, AppError>;
-    async fn get(&self, id: Uuid) -> Result<User, AppError>;
-    async fn delete(&self, id: Uuid) -> Result<User, AppError>;
-    async fn update(&self, id: Uuid, opt: &UserOption) -> Result<User, AppError>;
-    async fn list(&self, opt: &UserOption) -> Result<Vec<User>, AppError>;
+    async fn create(&self, input: RegisterInput) -> Result<User>;
+    async fn get(&self, id: Uuid) -> Result<User>;
+    async fn delete(&self, id: Uuid) -> Result<User>;
+    async fn update(&self, id: Uuid, opt: UpdateUserInput) -> Result<User>;
+    async fn list(&self, input: ListUserInput) -> Result<Vec<User>>;
 }
 
 #[derive(Clone)]
@@ -39,25 +42,47 @@ impl<T> UserService for UserServiceImpl<T>
 where
     T: UserRepo + Sync + Send,
 {
-    async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
+    async fn create(&self, input: RegisterInput) -> Result<User> {
+        let user = CreateUser {
+            name: input.name,
+            email: input.email,
+            password: input.password,
+        };
         Ok(self.user_repo.create(user).await?)
     }
 
-    async fn get(&self, id: Uuid) -> Result<User, AppError> {
+    async fn get(&self, id: Uuid) -> Result<User> {
         Ok(self.user_repo.get(id).await?)
     }
 
-    async fn delete(&self, id: Uuid) -> Result<User, AppError> {
+    async fn delete(&self, id: Uuid) -> Result<User> {
         Ok(self.user_repo.delete(id).await?)
     }
 
-    async fn update(&self, id: Uuid, opt: &UserOption) -> Result<User, AppError> {
-        let origin_user = self.user_repo.get(id).await?;
-        let user = opt.clone().new_user(origin_user);
-        Ok(self.user_repo.update(&user).await?)
+    async fn update(&self, id: Uuid, input: UpdateUserInput) -> Result<User> {
+        let mut origin_user = self.user_repo.get(id).await?;
+
+        if let Some(name) = input.name {
+            origin_user.name = name;
+        }
+
+        if let Some(email) = input.email {
+            origin_user.email = email;
+        }
+
+        if let Some(password) = input.password {
+            origin_user.password = password;
+        }
+        Ok(self.user_repo.update(&origin_user).await?)
     }
 
-    async fn list(&self, opt: &UserOption) -> Result<Vec<User>, AppError> {
+    async fn list(&self, input: ListUserInput) -> Result<Vec<User>> {
+        let opt = UserOption {
+            name: input.name,
+            email: input.email,
+            offset: input.limit_offset.offset,
+            limit: input.limit_offset.limit,
+        };
         Ok(self.user_repo.list(opt).await?)
     }
 }
@@ -65,10 +90,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        dao::user_repo::MockUserRepo,
-        models::user::{CreateUser, User, UserOption},
-    };
+    use crate::{dao::user_repo::MockUserRepo, models::user::User};
     use chrono::Utc;
     use mockall::predicate::*;
     use uuid::Uuid;
@@ -94,9 +116,10 @@ pub mod tests {
 
         let sut = UserServiceImpl { user_repo };
         let mock_create_result = sut
-            .create(&CreateUser {
+            .create(RegisterInput {
                 name: "f1".to_string(),
                 password: "l1".to_string(),
+                password2: "l1".to_string(),
                 email: "shenshouer51@gmail.com".to_string(),
             })
             .await;
@@ -149,7 +172,7 @@ pub mod tests {
             .with(always())
             .returning(|_x| Ok(Vec::new()));
         let sut = UserServiceImpl { user_repo };
-        let mock_list_result = sut.list(&UserOption::default()).await;
+        let mock_list_result = sut.list(ListUserInput::default()).await;
         assert!(mock_list_result.is_ok());
     }
 
@@ -174,9 +197,11 @@ pub mod tests {
 
         let sut = UserServiceImpl { user_repo };
 
-        let opt = &UserOption {
+        let opt = UpdateUserInput {
             name: Some("fk".to_string()),
-            ..Default::default()
+            email: None,
+            password: None,
+            password2: None,
         };
         let mock_update_result = sut.update(uid, opt).await;
         assert!(mock_update_result.is_ok());

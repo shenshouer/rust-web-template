@@ -1,6 +1,10 @@
+use super::ApiResponse;
 use crate::{
-    errors::AppError,
-    services::user::{CreateUser, User, UserOption, UserService, UserServiceImpl},
+    dto::validate_payload,
+    errors::{ApiResult, Error},
+    services::user::{
+        DynUserService, ListUserInput, RegisterInput, UpdateUserInput, User, UserServiceImpl,
+    },
 };
 use axum::{
     extract::{Extension, Path, Query},
@@ -12,144 +16,106 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub(crate) fn router(pool: Arc<PgPool>) -> Router {
-    let user_svc = UserServiceImpl::new(pool);
+    let user_svc: DynUserService = Arc::new(UserServiceImpl::new(pool));
     configure(user_svc)
 }
 
-fn configure<T>(user_svc: T) -> Router
-where
-    T: UserService + Clone + Send + Sync + 'static,
-{
+fn configure(user_svc: DynUserService) -> Router {
     Router::new()
-        .route("/", post(create_user::<T>).get(list_user::<T>))
+        .route("/", post(create_user).get(list_user))
         .route(
             "/:user_id",
-            get(get_user::<T>)
-                .delete(delete_user::<T>)
-                .put(update_user::<T>),
+            get(get_user).delete(delete_user).put(update_user),
         )
         .layer(&AddExtensionLayer::new(user_svc))
 }
 
-async fn create_user<T: UserService>(
-    Extension(svc): Extension<T>,
-    Json(payload): Json<CreateUser>,
-) -> Result<Json<User>, AppError> {
-    Ok(svc.create(&payload).await?.into())
+async fn create_user(
+    Extension(svc): Extension<DynUserService>,
+    Json(input): Json<RegisterInput>,
+) -> ApiResult<ApiResponse<User>> {
+    validate_payload(&input)?;
+    Ok(ApiResponse::success(svc.create(input).await?.into()))
 }
 
-async fn get_user<T: UserService>(
-    Extension(svc): Extension<T>,
+async fn get_user(
+    Extension(svc): Extension<DynUserService>,
     Path(id): Path<Uuid>,
-) -> Result<Json<User>, AppError> {
-    Ok(svc.get(id).await?.into())
+) -> ApiResult<ApiResponse<User>> {
+    // Ok(svc.get(id).await?.into())
+    Ok(ApiResponse::success(svc.get(id).await?))
 }
 
-async fn delete_user<T: UserService>(
-    Extension(svc): Extension<T>,
+async fn delete_user(
+    Extension(svc): Extension<DynUserService>,
     Path(id): Path<Uuid>,
-) -> Result<Json<User>, AppError> {
-    Ok(svc.delete(id).await?.into())
+) -> ApiResult<ApiResponse<User>> {
+    Ok(ApiResponse::success(svc.delete(id).await?))
 }
 
-async fn update_user<T: UserService>(
-    Extension(svc): Extension<T>,
+async fn update_user(
+    Extension(svc): Extension<DynUserService>,
     Path(id): Path<Uuid>,
-    Json(opt): Json<UserOption>,
-) -> Result<Json<User>, AppError> {
-    Ok(svc.update(id, &opt).await?.into())
-}
-
-async fn list_user<T: UserService>(
-    Extension(svc): Extension<T>,
-    Query(mut opt): Query<UserOption>,
-) -> Result<Json<Vec<User>>, AppError> {
-    match opt.limit {
-        None => opt.limit = Some(20),
-        Some(n) if n > 100 => opt.limit = Some(100),
-        Some(n) => opt.limit = Some(n),
+    Json(input): Json<UpdateUserInput>,
+) -> ApiResult<ApiResponse<User>> {
+    if !input.check() {
+        return Err(Error::new_empty_fields_error("update user failed".to_string()).into());
     }
+    validate_payload(&input)?;
+    Ok(ApiResponse::success(svc.update(id, input).await?))
+}
 
-    match opt.offset {
-        None => opt.offset = Some(0),
-        Some(n) => opt.offset = Some(n),
-    }
-    Ok(svc.list(&opt).await?.into())
+async fn list_user(
+    Extension(svc): Extension<DynUserService>,
+    Query(mut input): Query<ListUserInput>,
+) -> ApiResult<ApiResponse<Vec<User>>> {
+    input.limit_offset.check();
+    validate_payload(&input)?;
+    Ok(ApiResponse::success(svc.list(input).await?))
 }
 
 #[cfg(test)]
 mod tests {
-    /// 单元测试不全面，mockall实现的trait + Clone 在axum中传递有问题
+
     use super::*;
-    use crate::services::user::{CreateUser, User, UserService};
+    use crate::services::user::MockUserService;
     use axum::{
-        async_trait,
         body::Body,
         http::{self, request::Request, StatusCode},
     };
+    use std::sync::Arc;
     use tower::ServiceExt;
-
-    #[derive(Clone)]
-    struct MockUserService {}
-    #[async_trait]
-    impl UserService for MockUserService {
-        async fn create(&self, user: &CreateUser) -> Result<User, AppError> {
-            Ok(User {
-                name: user.name.clone(),
-                email: user.email.clone(),
-                password: user.password.clone(),
-                ..Default::default()
-            })
-        }
-
-        async fn get(&self, id: Uuid) -> Result<User, AppError> {
-            Ok(User {
-                id: id,
-                ..Default::default()
-            })
-        }
-        async fn delete(&self, id: Uuid) -> Result<User, AppError> {
-            Ok(User {
-                id: id,
-                ..Default::default()
-            })
-        }
-        async fn update(&self, id: Uuid, opt: &UserOption) -> Result<User, AppError> {
-            let user = User {
-                id: id,
-                ..Default::default()
-            };
-            let user = opt.clone().new_user(user);
-            Ok(user)
-        }
-        async fn list(&self, _opt: &UserOption) -> Result<Vec<User>, AppError> {
-            Ok(Vec::new())
-        }
-    }
-
-    impl MockUserService {
-        fn new() -> Self {
-            MockUserService {}
-        }
-    }
 
     #[tokio::test]
     async fn test_user_controller_create() {
-        let create_user_param = &CreateUser {
-            name: "fn".to_string(),
+        let mut svc = MockUserService::new();
+        svc.expect_create().returning(|input| {
+            Ok(User {
+                id: Uuid::new_v4(),
+                name: input.name,
+                email: input.email,
+                password: input.password,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            })
+        });
+
+        let app = configure(Arc::new(svc));
+
+        let create_user_param = &RegisterInput {
+            name: "testname".to_string(),
             email: "shenshouer51@gmail.com".to_string(),
             password: "18612424366".to_string(),
+            password2: "18612424366".to_string(),
         };
 
-        let app = configure(MockUserService::new());
-
-        // create api test
         let response = app
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
                     .uri("/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
                     .body(Body::from(
                         serde_json::to_string(create_user_param).unwrap(),
                     ))
@@ -161,13 +127,20 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let user: User = serde_json::from_slice(&body).unwrap();
-        assert_eq!(create_user_param.name, user.name);
+        let user: ApiResponse<User> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(create_user_param.name, user.data.unwrap().name);
     }
 
     #[tokio::test]
     async fn test_user_controller_get() {
-        let app = configure(MockUserService::new());
+        let mut svc = MockUserService::new();
+        svc.expect_get().returning(|id| {
+            Ok(User {
+                id: id,
+                ..Default::default()
+            })
+        });
+        let app = configure(Arc::new(svc));
 
         let uid = Uuid::new_v4();
         let response = app
@@ -175,6 +148,7 @@ mod tests {
                 Request::builder()
                     .method(http::Method::GET)
                     .uri(format!("/{}", uid))
+                    .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -184,7 +158,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let user: User = serde_json::from_slice(&body).unwrap();
-        assert_eq!(uid, user.id);
+        let user: ApiResponse<User> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(uid, user.data.unwrap().id);
     }
 }
