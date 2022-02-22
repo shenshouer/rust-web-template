@@ -20,16 +20,8 @@ pub enum Error {
     AxumTypedHeaderError(#[from] axum::extract::rejection::TypedHeaderRejection),
     #[error(transparent)]
     AxumExtensionError(#[from] axum::extract::rejection::ExtensionRejection),
-    // #[error("password doesn't match")]
-    // WrongPassword,
-    // #[error("email is already taken")]
-    // DuplicateUserEmail,
-    // #[error("name is already taken")]
-    // DuplicateUserName,
-    // #[error("page limit not in range")]
-    // WrongLimit(#[from] validator::ValidationError),
-    // #[error("other error")]
-    // Other(String)
+    #[error("email: {0} is already taken")]
+    DuplicateUserEmail(String),
 }
 
 impl Error {
@@ -47,7 +39,9 @@ impl From<Error> for ApiError {
     fn from(err: Error) -> Self {
         let status = match err {
             Error::WrongCredentials => StatusCode::UNAUTHORIZED,
-            Error::ValidationError(_) | Error::EmptyFields(_) => StatusCode::BAD_REQUEST,
+            Error::ValidationError(_) | Error::EmptyFields(_) | Error::DuplicateUserEmail(_) => {
+                StatusCode::BAD_REQUEST
+            }
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let payload = json!({"ok": false, "error": err.to_string()});

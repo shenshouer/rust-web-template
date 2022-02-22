@@ -6,7 +6,7 @@ use crate::{
         auth::{LoginInput, TokenPayload},
         validate_payload,
     },
-    errors::ApiResult,
+    errors::{ApiResult, Error},
     services::auth::{DynAuthService, User},
 };
 use axum::{
@@ -34,7 +34,10 @@ async fn login(
     Json(input): Json<LoginInput>,
 ) -> ApiResult<ApiResponse<TokenPayload>> {
     validate_payload(&input)?;
-    let user = svc.sign_in(input).await?;
+    let user = svc
+        .sign_in(input)
+        .await
+        .map_err(|_| Error::WrongCredentials)?;
     let token = jwt::sign(user.id)?;
     Ok(ApiResponse::success(TokenPayload {
         access_token: token,

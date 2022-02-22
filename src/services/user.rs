@@ -1,7 +1,7 @@
 pub(crate) use crate::{
     dao::user_repo::{UserRepo, UserRepoImpl},
     dto::user::{ListUserInput, RegisterInput, UpdateUserInput},
-    errors::Result,
+    errors::{Error, Result},
     models::user::{CreateUser, User, UserOption},
 };
 use axum::async_trait;
@@ -48,6 +48,12 @@ where
             email: input.email,
             password: input.password,
         };
+
+        let email = user.email.clone();
+        if self.user_repo.get_by_email(&email).await.is_ok() {
+            return Err(Error::DuplicateUserEmail(email));
+        }
+
         Ok(self.user_repo.create(user).await?)
     }
 
