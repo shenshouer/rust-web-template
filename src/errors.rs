@@ -2,8 +2,6 @@ use axum::{http::StatusCode, Json};
 use serde_json::{json, Value};
 use thiserror::Error;
 
-// pub type Result<T> = std::result::Result<T, AppError>;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]

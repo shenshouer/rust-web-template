@@ -120,6 +120,10 @@ pub mod tests {
                 })
             });
 
+        user_repo
+            .expect_get_by_email()
+            .returning(|_| Err(Error::new_empty_fields_error("mock test".to_string())));
+
         let sut = UserServiceImpl { user_repo };
         let mock_create_result = sut
             .create(RegisterInput {
