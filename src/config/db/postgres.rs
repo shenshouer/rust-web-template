@@ -4,6 +4,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 
 use crate::config::{db::DbPool, env::PgConfig};
 
+/// 为sqlxPgPool实现数据连接池获取接口
 #[async_trait]
 impl DbPool for PgPool {
     async fn retrieve() -> Self {

@@ -11,6 +11,7 @@ use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// user数据访问接口
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserRepo {
@@ -169,7 +170,6 @@ mod tests {
             pool: Arc::new(pool),
         };
 
-        // test create entity
         let create_entity = CreateUser {
             name: "fn1".to_string(),
             email: "email1".to_string(),

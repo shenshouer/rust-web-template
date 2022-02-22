@@ -2,6 +2,7 @@ use crate::models::user::User;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+/// 登录输入数据
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginInput {
     #[validate(email)]

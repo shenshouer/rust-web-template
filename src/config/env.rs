@@ -2,6 +2,7 @@ use std::net::IpAddr;
 
 use clap::Parser;
 
+/// http server 配置
 #[derive(Debug, Parser)]
 pub struct ServerConfig {
     #[clap(default_value = "127.0.0.1", env)]
@@ -10,6 +11,7 @@ pub struct ServerConfig {
     pub serv_port: u16,
 }
 
+/// PostgresSQL 数据库配置
 #[derive(Debug, Parser)]
 pub struct PgConfig {
     #[clap(required = true, env)]
@@ -22,12 +24,4 @@ pub struct PgConfig {
     pub pg_user: String,
     #[clap(default_value = "", env)]
     pub pg_password: String,
-}
-
-#[derive(Debug, Parser)]
-pub struct RedisConfig {
-    #[clap(default_value = "0.0.0.0", env)]
-    pub redis_host: IpAddr,
-    #[clap(default_value = "6379", env)]
-    pub redis_port: u16,
 }

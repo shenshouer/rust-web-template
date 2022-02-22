@@ -1,6 +1,10 @@
+/// 认证实现
 mod auth;
+/// 主页
 mod home;
+/// token相关功能
 mod jwt;
+/// 用户模块逻辑层
 mod users;
 
 use super::{
@@ -30,7 +34,7 @@ pub fn routers(pool: Arc<PgPool>) -> Router {
         .layer(&AddExtensionLayer::new(auth_svc))
 }
 
-// 统一APi成功相应格式
+// 统一APi成功响应格式
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T: Serialize> {
     ok: bool,
