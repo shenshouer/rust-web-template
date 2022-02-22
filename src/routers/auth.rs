@@ -104,7 +104,7 @@ mod tests {
         let mut svc = MockAuthService::new();
         svc.expect_get().returning(|id| {
             Ok(User {
-                id: id,
+                id,
                 email: "test@example.com".to_string(),
                 ..Default::default()
             })
@@ -113,14 +113,16 @@ mod tests {
         std::env::set_var("JWT_SECRET", "example_secret_key");
         let app = configure_with_auth_service(Arc::new(svc));
 
+        let token = format!("Bearer {}", jwt::sign(uuid::Uuid::new_v4()).unwrap());
+        println!("---->> token: {}", &token);
         let response = app
             .oneshot(
-            Request::builder()
-                .method(http::Method::GET)
-                .uri("/authorize")
-                .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
-                .body(Body::empty())
-                .unwrap()
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/authorize")
+                    .header(http::header::AUTHORIZATION, token)
+                    .body(Body::empty())
+                    .unwrap(),
             )
             .await
             .unwrap();

@@ -78,7 +78,7 @@ async fn list_user(
 mod tests {
 
     use super::*;
-    use crate::services::user::MockUserService;
+    use crate::{routers::jwt, services::user::MockUserService};
     use axum::{
         body::Body,
         http::{self, request::Request, StatusCode},
@@ -115,7 +115,10 @@ mod tests {
                     .method(http::Method::POST)
                     .uri("/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", jwt::sign(uuid::Uuid::new_v4()).unwrap()),
+                    )
                     .body(Body::from(
                         serde_json::to_string(create_user_param).unwrap(),
                     ))
@@ -136,7 +139,7 @@ mod tests {
         let mut svc = MockUserService::new();
         svc.expect_get().returning(|id| {
             Ok(User {
-                id: id,
+                id,
                 ..Default::default()
             })
         });
@@ -148,7 +151,10 @@ mod tests {
                 Request::builder()
                     .method(http::Method::GET)
                     .uri(format!("/{}", uid))
-                    .header(http::header::AUTHORIZATION, "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0NTcyN2E3Ni1mZDNhLTQ5ZTEtYTEyMC1jYjEwNWFmOGIxZDciLCJleHAiOjE2NDU1MzMyMTcsImlhdCI6MTY0NTQ0NjgxN30.r3B0vI7IOKLxbRzUihewvQwTdf25ZusaZRknqzceLvU")
+                    .header(
+                        http::header::AUTHORIZATION,
+                        format!("Bearer {}", jwt::sign(uuid::Uuid::new_v4()).unwrap()),
+                    )
                     .body(Body::empty())
                     .unwrap(),
             )
