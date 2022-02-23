@@ -76,7 +76,7 @@ impl Display for UserOption {
             where_condition = format!("{where_condition}email='{email}' AND ");
         }
 
-        if where_condition.is_empty() {
+        if !where_condition.is_empty() {
             where_condition = format!("WHERE {where_condition}").trim_end().to_string();
             if where_condition.ends_with("AND") {
                 where_condition = where_condition.strip_suffix("AND").unwrap().into();
