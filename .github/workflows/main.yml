@@ -33,7 +33,7 @@ jobs:
   #         args: --all -- --check
 
   rustfmt-test:
-    needs: [check, fmt]
+    needs: [check]
     name: Test Suite
     runs-on: ubuntu-latest
     services:
