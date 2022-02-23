@@ -177,10 +177,10 @@ mod tests {
         };
 
         info!("testing create new user ");
-        let ref user = sut.create(create_entity.clone()).await.unwrap();
+        let user = sut.create(create_entity.clone()).await.unwrap();
 
-        assert_eq!(user.name, create_entity.name);
-        assert_eq!(false, user.id.is_nil());
+        assert_eq!(&user.name, &create_entity.name);
+        assert!(!user.id.is_nil());
 
         info!("testing get user ");
         let mut get_user = sut.get(user.id).await.unwrap();
@@ -197,17 +197,17 @@ mod tests {
             name: Some(String::from("1111")),
             ..Default::default()
         };
-        let ref users = sut.list(user_option).await.unwrap();
+        let users = sut.list(user_option).await.unwrap();
         assert_eq!(1, users.len());
         // info!("{}", serde_json::to_string(users).unwrap());
 
         info!("testing delete user ");
         let old_user = users.get(0).unwrap();
-        let ref delete_user = sut.delete(old_user.id).await.unwrap();
+        let delete_user = sut.delete(old_user.id).await.unwrap();
 
         assert_eq!(
             serde_json::to_string(old_user).unwrap(),
-            serde_json::to_string(delete_user).unwrap()
+            serde_json::to_string(&delete_user).unwrap()
         );
 
         // let users = sut.list(&user_option).await.unwrap();

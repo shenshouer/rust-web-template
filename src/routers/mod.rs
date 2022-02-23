@@ -28,7 +28,7 @@ use std::sync::Arc;
 pub fn routers(pool: Arc<PgPool>) -> Router {
     let auth_svc: DynAuthService = Arc::new(AuthServiceImpl::new(pool.clone()));
     Router::new()
-        .nest("/users", users::router(pool.clone()))
+        .nest("/users", users::router(pool))
         .nest("/auth", auth::router())
         .nest("", home::router())
         .layer(&AddExtensionLayer::new(auth_svc))
@@ -79,10 +79,10 @@ where
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| Error::from(err))?;
+                .map_err(Error::from)?;
         let Extension(svc) = Extension::<DynAuthService>::from_request(req)
             .await
-            .map_err(|err| Error::from(err))?;
+            .map_err(Error::from)?;
 
         let claims = jwt::verify(bearer.token())?;
         let user = svc.get(claims.sub).await?;

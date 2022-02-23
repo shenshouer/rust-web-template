@@ -112,9 +112,9 @@ pub mod tests {
             .returning(|param| {
                 Ok(User {
                     id: Uuid::new_v4(),
-                    name: param.name.clone(),
-                    password: param.password.clone(),
-                    email: param.email.clone(),
+                    name: param.name,
+                    password: param.password,
+                    email: param.email,
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 })
@@ -140,15 +140,12 @@ pub mod tests {
     async fn test_user_service_get() {
         let mut user_repo = MockUserRepo::new();
         let get_param = Uuid::new_v4();
-        user_repo
-            .expect_get()
-            .with(eq(get_param.clone()))
-            .returning(|id| {
-                Ok(User {
-                    id: id,
-                    ..Default::default()
-                })
-            });
+        user_repo.expect_get().with(eq(get_param)).returning(|id| {
+            Ok(User {
+                id,
+                ..Default::default()
+            })
+        });
 
         let sut = UserServiceImpl { user_repo };
 
@@ -162,10 +159,10 @@ pub mod tests {
         let delete_param = Uuid::new_v4();
         user_repo
             .expect_delete()
-            .with(eq(delete_param.clone()))
+            .with(eq(delete_param))
             .returning(|id| {
                 Ok(User {
-                    id: id,
+                    id,
                     ..Default::default()
                 })
             });
@@ -190,15 +187,12 @@ pub mod tests {
     async fn test_user_service_update() {
         let mut user_repo = MockUserRepo::new();
         let uid = Uuid::new_v4();
-        user_repo
-            .expect_get()
-            .with(eq(uid.clone()))
-            .returning(|id| {
-                Ok(User {
-                    id: id,
-                    ..Default::default()
-                })
-            });
+        user_repo.expect_get().with(eq(uid)).returning(|id| {
+            Ok(User {
+                id,
+                ..Default::default()
+            })
+        });
 
         user_repo
             .expect_update()

@@ -30,6 +30,6 @@ pub fn app(pg_pool: sqlx::PgPool) -> Router {
 
     let pool = Arc::new(pg_pool);
     Router::new()
-        .nest("/api/v1", routers::routers(pool.clone()))
+        .nest("/api/v1", routers::routers(pool))
         .layer(middleware_stack)
 }

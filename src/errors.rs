@@ -5,19 +5,19 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DataStoreError(#[from] sqlx::Error),
+    DataStore(#[from] sqlx::Error),
     #[error(transparent)]
-    ValidationError(#[from] validator::ValidationErrors),
+    Validation(#[from] validator::ValidationErrors),
     #[error("empty fields")]
     EmptyFields(String),
     #[error(transparent)]
-    JwtError(#[from] jsonwebtoken::errors::Error),
+    Jwt(#[from] jsonwebtoken::errors::Error),
     #[error("wrong credentials")]
     WrongCredentials,
     #[error(transparent)]
-    AxumTypedHeaderError(#[from] axum::extract::rejection::TypedHeaderRejection),
+    AxumTypedHeader(#[from] axum::extract::rejection::TypedHeaderRejection),
     #[error(transparent)]
-    AxumExtensionError(#[from] axum::extract::rejection::ExtensionRejection),
+    AxumExtension(#[from] axum::extract::rejection::ExtensionRejection),
     #[error("email: {0} is already taken")]
     DuplicateUserEmail(String),
 }
@@ -37,7 +37,7 @@ impl From<Error> for ApiError {
     fn from(err: Error) -> Self {
         let status = match err {
             Error::WrongCredentials => StatusCode::UNAUTHORIZED,
-            Error::ValidationError(_) | Error::EmptyFields(_) | Error::DuplicateUserEmail(_) => {
+            Error::Validation(_) | Error::EmptyFields(_) | Error::DuplicateUserEmail(_) => {
                 StatusCode::BAD_REQUEST
             }
             _ => StatusCode::INTERNAL_SERVER_ERROR,

@@ -76,7 +76,7 @@ impl Display for UserOption {
             where_condition = format!("{where_condition}email='{email}' AND ");
         }
 
-        if where_condition.len() > 0 {
+        if where_condition.is_empty() {
             where_condition = format!("WHERE {where_condition}").trim_end().to_string();
             if where_condition.ends_with("AND") {
                 where_condition = where_condition.strip_suffix("AND").unwrap().into();
@@ -87,7 +87,7 @@ impl Display for UserOption {
         if let Some(offset) = self.offset {
             offset_condition = format!("OFFSET {offset}");
         } else {
-            offset_condition = format!("OFFSET 0");
+            offset_condition = String::from("OFFSET 0");
         }
         if let Some(limit) = self.limit {
             offset_condition = format!("{offset_condition} LIMIT {limit}");

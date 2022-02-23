@@ -65,9 +65,7 @@ mod tests {
             .expect_authenticate()
             .with(always())
             .returning(|_| Ok(User::default()));
-        let sut = AuthServiceImpl {
-            user_repo: user_repo,
-        };
+        let sut = AuthServiceImpl { user_repo };
 
         let input = LoginInput {
             email: "shenshouer51@163.com".to_string(),
@@ -92,9 +90,7 @@ mod tests {
                     "mock login failure in auth service".to_string(),
                 ))
             });
-        let sut = AuthServiceImpl {
-            user_repo: user_repo,
-        };
+        let sut = AuthServiceImpl { user_repo };
 
         let actual = sut.sign_in(input).await;
         assert!(actual.is_err());

@@ -35,7 +35,7 @@ async fn create_user(
     Json(input): Json<RegisterInput>,
 ) -> ApiResult<ApiResponse<User>> {
     validate_payload(&input)?;
-    Ok(ApiResponse::success(svc.create(input).await?.into()))
+    Ok(ApiResponse::success(svc.create(input).await?))
 }
 
 async fn get_user(
