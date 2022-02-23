@@ -34,7 +34,7 @@ jobs:
 
   rustfmt-test:
     needs: [check]
-    name: Test Suite
+    name: Rustfmt And Test Suite
     runs-on: ubuntu-latest
     services:
       postgres:
