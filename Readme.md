@@ -1,7 +1,7 @@
 # rust-web-template
 
-This is a template project for rust web application with use `axum` as web framework, tokio as async runtime, sqlx as DAO level.
-mockall for all unit tests
+This is a template project for rust web application with use `axum` as web framework, `tokio` as async runtime, `sqlx` as DAO level.
+`mockall` for all unit tests
 
 ## Start db first
 
@@ -12,7 +12,7 @@ docker run -d --name postgres \
        -e POSTGRES_PASSWORD=p@ssword! \
        -e PGDATA=/var/lib/postgresql/data/pgdata \
        -v /mnt/c/Users/sope/workspaces/db/postgres/data:/var/lib/postgresql/data \
-       postgres:9.6.24```
+       postgres:9.6.24
 
 ```
 
